@@ -226,7 +226,7 @@ export function useRef(initialValue) {
 }
 ```
 
-객체 값을 변경해도 객체를 가리키는 주소가 변경되지 않는 점을
+객체 값을 변경해도 객체를 가리키는 주소가 변경되지 않는 JS의 특징을 이용한 방식입니다.
 
 ## 3.1.6 useContext
 
