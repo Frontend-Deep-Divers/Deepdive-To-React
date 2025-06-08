@@ -171,7 +171,7 @@ function TextOrHeading({
 }
 ```
 
-### 2.1.4 정리
+## 2.1.4 정리
 
 위는 JSX 공식 문서에 있는 JSX의 스펙으로, JSX 문법에 있지만 `JSXNamespacedName`, `JSXMemberExpression`과 같이 리액트가 사용하지 않는 생소한 것들도 있습니다.
 
@@ -311,7 +311,7 @@ function createFiberFromFragment(elements, mode, lanes, key) {
 
 - `tag`: 파이버가 하나의 `element`에 매칭되는 정보를 가집니다. 이는 리액트 컴포넌트, HTML의 DOM 노드, 혹은 다른 어떤 것이 될 수 있습니다. 이는 아래에 나열된 값들이 됩니다.
 
-  ```JS
+  ```js
   var FunctionComponent = 0;
   var ClassComponent = 1;
   var IndeterminateComponent = 2;
