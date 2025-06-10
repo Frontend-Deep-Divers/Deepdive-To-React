@@ -422,3 +422,131 @@ export default App;
 
 1. 컴포넌트 최상단에서만 훅을 호출해야 한다. 반복문이나 조건문, 중첩된 함수 내에서 훅을 실행할 수 없다. 매 렌더링마다 훅의 호출 순서를 보장할 수 없기 때문이다.
 2. 리액트 함수 컴포넌트, 혹은 사용자 정의 훅에서만 훅을 호출할 수 있다. 일반 JS 함수에서는 훅을 사용할 수 없다.
+
+# 3.2 사용자 정의 훅과 고차 컴포넌트
+
+리액트에서는 사용자 정의 훅과 고차 컴포넌트를 활용해 재사용 로직을 관리할 수 있습니다.
+
+## 3.2.1 사용자 정의 훅
+
+서로 다른 컴포넌트 내부에서 같은 로직을 공유하고자 할 때 주로 사용합니다.
+
+HTTP 요청하는 `fetch`를 수행하는 사용자 정의 훅 예제입니다.
+
+`use` 접두어를 사용해 리액트 훅임을 명시해 사용하는 것이 권장됩니다.
+
+```ts
+import { useEffect, useState } from 'react'
+
+// HTTP 요청을 하는 사용자 정의 훅
+function useFetch<T>({
+  url,
+  method,
+  body,
+}: { url: string, method, body }: { method: string; body?: XMLHttpRequestBodyInit }) {
+  // 응답 결과
+  const [result, setResult] = useState<T | undefined>()
+
+  // 요청 중 여부
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+
+  // 2xx 3xx로 정상 응답인지 여부
+  const [ok, setOk] = useState<boolean | undefined>()
+
+  // HTTP status
+  const [status, setStatus] = useState<number | undefined>()
+
+  useEffect(() => {
+    const abortController = new AbortController()
+
+    ;(async () => {
+      setIsLoading(true)
+
+      const response = await fetch(url, {
+        method,
+        body,
+        signal: abortController.signal,
+      })
+
+      setOk(response.ok)
+      setStatus(response.status)
+
+      if (response.ok) {
+        const apiResult = await response.json()
+        setResult(apiResult)
+      }
+
+      setIsLoading(false)
+    })()
+
+    return () => {
+      abortController.abort()
+    }
+  }, [url, method, body])
+
+  return { ok, result, isLoading, status }
+}
+```
+
+사용자 정의 훅은 리액트 커뮤니티에도 레퍼런스가 많은데, useHooks(https://usehooks.com/), react-use(https://github.com/streamich/react-use), ahooks(https://ahooks.js.org/) 등이 있습니다.
+
+## 3.2.2 고차 컴포넌트
+
+고차 컴포넌트는 JS의 일급 객체, 함수의 특징을 활용한 로직 재사용 방법이므로, JS 환경에서는 널리 쓰이는 방식입니다. 대표적인 리액트의 고차 컴포넌트로 `React.memo`가 있습니다.
+
+`React.memo`는 props의 변화가 없음에도 리렌더링되는 현상을 방지하기 위해 사용됩니다. 이전 props와 비교해 이전과 같다면 렌더링 자체를 생략하고, 메모이제이션된 컴포넌트를 반환합니다. 앞서 봤던 `PureComponent`와 유사한 방식입니다.
+
+고차 컴포넌트는 컴포넌트의 결과물에 영향을 미칠 수 있는 공통된 작업을 처리하는 데 유용합니다.
+
+```ts
+interface LoginProps {
+  loginRequired?: boolean;
+}
+
+function withLoginComponent<T>(Component: ComponentType<T>) {
+  return function (props: T & LoginProps) {
+    const { loginRequired, ...restProps } = props;
+
+    if (loginRequired) {
+      return <>로그인이 필요합니다.</>;
+    }
+
+    return <Component {...(restProps as T)} />;
+  };
+}
+
+// 원래 구현하고자 하는 컴포넌트를 만들고, withLoginComponent로 감싸기만 하면 끝이다.
+// 로그인 여부, 로그인이 안 되면 다른 컴포넌트를 렌더링하는 책임은 모두
+// 고차 컴포넌트인 withLoginComponent에 맡길 수 있어 매우 편리하다.
+const Component = withLoginComponent(({ props }: { value: string }) => {
+  return <h3>{props.value}</h3>;
+});
+
+export default function App() {
+  // 로그인 관련 정보를 가져온다.
+  const isLogin = true;
+  return <Component value="text" loginRequired={isLogin} />;
+  // return <Component value="text" />;
+}
+```
+
+고차 컴포넌트는 `with`라는 접두어를 붙여 선언합니다. ESLint 등에 규칙이 있는 건 아니지만 리액트 커뮤니티에서 관습적으로 사용되어 온 네이밍입니다.
+
+고차 컴포넌트를 사용할 때 주의할 점:
+
+1. 컴포넌트의 props를 임의로 수정, 추가, 삭제하여 부수 효과를 일으키지 말 것: 컴포넌트를 사용하는 입장에서 props가 변경되어 예기치 못한 동작을 일으킬 수 있다는 부담감을 주는 것은 좋지 않습니다.
+2. 최소한으로 사용할 것: 여러 개의 고차 컴포넌트를 감싸면 복잡성이 커지게 됩니다.
+
+## 3.2.3 사용자 정의 훅과 고차 컴포넌트 중 무엇을 써야 할까?
+
+### 사용자 정의 훅이 필요한 경우
+
+단순히 리액트에서 제공하는 훅으로 공통 로직을 관리할 수 있다면 사용자 정의 훅을 사용하는 것이 좋습니다. 사용자 정의 훅 자체는 컴포넌트 렌더링에 영향을 주지 않아, 컴포넌트 내부에 미치는 영향을 최소화해 개발할 수 있다는 장점이 있습니다.
+
+컴포넌트 전반에 동일한 로직으로 값을 제공하거나, 특정한 훅의 작동을 넣고 싶다면 사용자 정의 훅을 사용합니다.
+
+### 고차 컴포넌트를 사용해야 하는 경우
+
+특정 상황에서 공통의 대체 컴포넌트를 노출하고자 할 때 유용합니다. 사용자 정의 훅은 컴포넌트가 반환하는 렌더링 결과물에까지 영향을 미치기는 어렵기 때문입니다.
+
+함수 컴포넌트의 반환값, 즉 렌더링의 결과물에도 영향을 미치는 공통 로직은 고차 컴포넌트를 사용하면 매우 유용합니다.
